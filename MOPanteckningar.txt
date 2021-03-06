@@ -1,0 +1,324 @@
+# assembly
+LDR: till <- från
+STR: från -> till
+MVN: till -> från
+MOV: till -> från
+
+char kan antas vara unsigned char: .SPACE 1
+.ALIGN kan behövas om man vill vara försiktig
+
+LDRB: unsigned char
+LDRH: unsigned short
+LDR: unsigned/signed int
+MOV: liten konstant - 0-0xFF
+STRB, STRH, STR: samma princip som med LDR-
+Försiktig när man laddar adresser dock, de är 32 bit, alltså för stora för 
+LDRB. Därför LDR R0,=x; LDRB R0,[R0]
+
+C -> Assembly
+
+char c,d;
+void foo(void)
+{
+    c = ~d;
+}
+
+->
+
+c: .SPACE 1
+d: .SPACE 1
+
+foo:
+    LDR R0,=d       ladda in d's adress till R0
+    LDRB R0,[R0]    ladda värdet på d's adress i minnet till R0, alltså d
+    MVN R1,R0       MVN: "move not" flyttar negationen av R0, d, till R1
+    LDR R0,=c       ladda c's adress till R0
+    STRB R1,[R0]    ladda det negerade värdet av d till minnesplatsen av R0
+    BX LR           brancha till länkregistret, return i princip
+
+
+MOV kan ge kodförbättring:
+MOV R0,#1 bättre än 
+LDR R0,=1
+
+Övning:
+Följande deklarationer är gjorda på global nivå, visa hur deklarationerna
+uttrycks i assemblerspråk.
+char c1,c2;
+short s1,s2;
+int i1,i2;
+
+visa också hur tilldelningssatserna kan kodas i ARM-v6 assemblerspråk.
+c1=c2;
+s1=s2;
+i1=i2;
+
+1)
+.ALIGN
+i1: .SPACE 4
+i2: .SPACE 4
+
+s1: .SPACE 2
+s2: .SPACE 2
+
+c1: .SPACE 2
+c2: .SPACE 2
+.GLOBL i1,i2,s1,s2,c1,c2
+
+
+2)
+c1=c2;
+LDR  R0,=c2
+LDRB R0,[R0]
+LDR  R1,=c1
+STRB R0,[R1]
+
+s1=s2;
+LDR  R0,=s2
+LDRH R0,[R0]
+LDR  R1,=s1
+STRH R0,[R1]
+
+i1=i2;
+LDR R0,i2       Laddar värdet direkt: samma sak som att ladda adressen sen ladda värdet på den adressen
+LDR R1,=i1      Laddar adressen av i1
+STR R0,[R1]     Skriver värdet av i2 till adressen av i1
+
+# Samma lösning men utan direkt tilldelning
+#LDR R0,=i2
+#LDR R0,[R0]
+#LDR R1,=i1
+#STR R0,[R1]
+
+#Funktionsanrop
+
+f: 
+   ...
+   BX LR
+
+"BL f" kallar på funktionen
+
+BL <label>: LR <- PC, PC <- label
+BX  Rx    : PC <- Rx
+B  <label>: PC <- label
+
+#KONVENTION att placera returvärdet på funktionen i R0
+
+#Exempel
+char  f1(void);
+short f1(void);
+int   f1(void);
+
+char  c;
+short s;
+int   i;
+
+Koda tilldelningarna:
+c = f1();
+s = f2();
+i = f3();
+
+c)
+BL   f1
+LDR  R1,=c
+STRB R0,[R1]
+
+s)
+BL   f2
+LDR  R1,=s
+STRH R0,[R1]
+
+i)
+BL  f3
+LDR R1,=s
+STR R0,[R1] 
+
+
+#KONVENTION att använda R0-R3 i den ordningen för parametrar till subrutiner
+Övriga parametrar läggs på stacken
+
+int isupper (int c)
+{
+    if (c >= 'A' && c <= 'Z')
+        return 1;
+    return 0;
+}
+
+Följande är gjort
+int a,b;
+
+Visa "b=isupper(a);" i assembly:
+
+LDR R0,=a
+LDR R0,[R0]
+BL  isupper
+LDR R1,=b
+STR R0,[R1]
+
+
+
+#C
+int a,b,c;
+a = b+c/4 - (b>>2)*c + foo();
+(a+1); falskt om a==-1;
+(a <= b); falskt om a>b;
+
+
+
+Observera att alla operationer utförs på 32-bitars tal i register.
+Använd LDRH för unsigned short, LDRB för unsigned char.
+Om det är signed (short eller char) måste vi teckenutvidga före operation
+
+signed char c,d;
+void foo(void)
+{
+    c=-d;
+}
+
+LDR  R3,=d
+LDRB R3,[R3]
+SXTB R3,R3
+NEG  R3,R3
+LDR  R2,=c
+STRB R3,[R2]
+
+Binära operationer utförs med tre registerfält där sann register kan förekomma i flera fält.
+Alla operationer utförs på 32-bitars tal i register.
+# Instruktion  Till, Från1, Från2    I princip: Instruktion  Till,argument1,argument2
+ADD 
+SUB
+MUL
+AND, bitwise AND 
+ORR, bitwise OR
+EOR, bitwise XOR
+
+mask = mask << n;
+R0   <- mask
+R1   <- n
+LSL  R0,R0,R1
+mask <- R0
+
+min lösning:
+
+int pack(int year, int month, int day)
+{
+    int res;
+    res = year << 4;
+    res |= month << 5;
+    res <<= 5;
+    res |= day;
+    return res;
+
+}
+
+int pack(int year, int month, int day) 
+{
+    int rval;
+    rval = year << 9;    # month ska ju max vara 12 (b1100)(4 bitar) och day 31 (b11111)(5 bitar)
+                        # res är alltså year000000000
+    rval |= month << 5;
+    rval |= day;
+    return rval;
+}
+
+I assembly:
+pack:
+    MOV R3,#9    
+    LSL R0,R0,R3  #R0 <- year<<9
+    MOV R3,#5     
+    LSL R1,R1,R3  
+    ORR R0,R0,R1  #R0 <- R0 | month<<5
+    ORR R0,R0,R2  #R0 <- R0 | day
+    BX  LR        #return rval
+
+
+
+#Exempel: Uttrycksevaluering
+Utgå från att följande är gjorda på global nivå;
+char f(void);
+int  a,b;
+
+Visa en kodsekvens i assembly, som evaluerar följande uttrycks värde till R0
+
+f() + a * (b&4);
+
+svar:
+
+LDR R1,b
+MOV R2,#4
+AND R1,R1,R2
+NEG R1,R1
+LDR R2,a
+MUL R1,R1,R2
+BL  f 
+ADD R0,R0,R1
+
+
+#EXEMPEL 
+Följande deklarationer är gjorda:
+void f(int x, int y, int z, int w);
+int a,b,c,d;
+
+Visa hur f(a,b,c,d); kodas i assembly
+
+LDR R0,a
+LDR R1,b
+LDR R2,c
+LDR R3,d
+BL  f
+
+
+Funktionen
+int rintval(void)
+{
+    return 0x12345678;
+}
+
+kodas:
+rintval:
+    LDR  R0,=0x12345678
+    BX   LR
+
+
+#KONVENTION att använda registerparet R0:R1 för 64 bitars returvärde
+
+long long rval(void)
+{
+    return 0x1234567800000000;
+}
+
+kodas:
+rval:
+    MOV R0,#0
+    LDR R1,=0x12345678
+    BX  LR
+
+
+
+#EXEMPEL
+Funktionen int testme(int a, int b) är definierad
+Visa hur följande funktion kan kodas i assembly:
+int f(int x, int y)
+{
+    if (testme(x,y))
+        return 1;
+    return 0;
+}
+
+svar:
+f:  PUSH {LR}
+    BL   testme
+    CMP  R0,#0
+    BEQ  .COND
+    MOV  R0,#1
+.COND: POP {PC}
+
+
+
+
+
+
+
+
+
+
