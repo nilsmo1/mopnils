@@ -319,7 +319,7 @@ BEQ (==) signed/unsigned
 BNE (!=) signed/unsigned
 
 BLT (less than) signed
-BCC (less than)
+BCC (less than) unsigned
 
 BLE (less than or eq) signed
 BLS (less than or eq) unsigned
@@ -329,6 +329,88 @@ BHI (greater than) unsigned
 
 BGE (greater than or eq) signed 
 BCS (greater than or eq) unsigned
+
+
+Antag att följande deklarationer gjorts på toppnivå:
+unsigned int i,j;
+int k,l;
+
+Koda följande programsekvens i assembler:
+if (i<j )
+{
+    if (k<l)
+        L1;
+}
+L2;
+
+svar:
+
+LDR R0,i
+LDR R1,j
+CMP R0,R1
+BCS .L2
+LDR R2,k
+LDR R3,l
+CMP R2,R3
+BLT .L1
+B   .L2
+
+
+Funktionen isupper skrivs såhär i C:
+int isupper(int c) 
+{
+    if (c >= 'A' && c <= 'Z')
+        return 1;
+    return 0;
+}
+
+och såhär i assembly:
+isupper:
+    CMP R0,#'A'
+    BLT .L1
+    CMP R0,#'Z'
+    BGT .L1
+    (B  .L2?)
+.L2:
+    MOV R0,#1
+    BX  LR
+.L1:
+    MOV R0,#0
+    BX  LR
+
+
+#SATS
+int i,j,k;
+if (i>k)
+    k=i;
+else
+    k=j;
+
+
+    LDR R1,i
+    LDR R2,j
+    CMP R1,R2
+    BGT If_do
+If_else:
+    MOV R0,R2
+    B   If_end
+If_do:
+    MOV R0,R1
+If_end:
+    LDR R2,=k
+    STR R0,[R2]
+        ...
+
+
+
+
+
+
+
+
+
+
+
 
 
 
