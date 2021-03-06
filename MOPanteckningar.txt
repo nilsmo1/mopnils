@@ -314,9 +314,21 @@ f:  PUSH {LR}
 .COND: POP {PC}
 
 
+#CONDITIONS
+BEQ (==) signed/unsigned
+BNE (!=) signed/unsigned
 
+BLT (less than) signed
+BCC (less than)
 
+BLE (less than or eq) signed
+BLS (less than or eq) unsigned
 
+BGT (greater than) signed
+BHI (greater than) unsigned
+
+BGE (greater than or eq) signed 
+BCS (greater than or eq) unsigned
 
 
 
