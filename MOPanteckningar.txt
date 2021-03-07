@@ -1051,4 +1051,50 @@ else
     ...
 func(); /* do_this eller do_that...*/
 
+Assembly:
+    LDR R2,=do_this
+    LDR R3,=func
+    STR R2,[R3]
+    ...
+    LDR R3,func
+    BLX R3
 
+#EXEMPEL
+Visa i C och assembler hur en pekare till funktionen:
+    void do_this(void)
+placeras på adress 0x2001C000 i minnet 
+Tilldelningen kodas i C:
+*((void (**)(void)) 0x2001C000) = &do_this;
+
+Tilldelningen kodas i assembler:
+    LDR R0,=do_this
+    LDR R1,=0x2001C000
+    STR R0,[R1]
+
+#PEKARE TILL C-FUNKTIONER PÅ FAST ADRESS I MINNET
+#EXEMPEL
+En parameterlös subrutin "portinit" för att initiera
+hårdvaran i MD407 finns med ingång på adress 0x08000200 i minnet. 
+Visa hur denna kan anropas:
+a) I assembly
+LDR R0,=0x8000200
+BLX R0
+
+b) Från ett C-program
+#define portinit ((void) (**)(void)) 0x8000200)
+void xxx(void)
+{
+    portinit();
+}
+
+#FÄLT SOM PARAMETER TILL FUNKTION
+Ett fält i en parameterlista är en pekare
+    void foo(int i[]);
+[]-notationen finns men betyder pekare, dvs, detta är samm sak som:
+    void foo(int *i);
+Undviker kopiering av hela fält inför funktionsanropet. Längden av fältet 
+behöver inte vara känd.
+Dock: fältet kan ändras i en anropade funktionen
+
+Flerdimensionella arrays:
+arr[i][j] = arr+i*4+j
