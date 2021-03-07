@@ -1098,3 +1098,65 @@ Dock: fältet kan ändras i en anropade funktionen
 
 Flerdimensionella arrays:
 arr[i][j] = arr+i*4+j
+
+
+
+GPIO_D och GPIO_E används för generell IO (32 pinnar)
+
+#GPIO-PORTAR
+För varje port finns en uppsättning register där respektive pinnes funktion
+kan konfigureras. Registren kan läsas eller skrivas med byte, halfword eller word-operationer.
+GPIO_X_IDR: Input data register
+GPIO_X_ODR: Output data register
+
+De 16 pinnarna i en port kan konfigureras individuellt i mode register (MODER) för 
+någon av funktionerna:
+00: digital ingång
+01: digital utgång
+10: alternativ funktion
+11: analog funktion
+nu behandlar vi pinnarnas funktion som digital IO, dvs. de första två alternativen
+
+GPIO - MODE-REGISTER
+GPIO A: 0x40020000
+GPIO B: 0x40020400
+GPIO C: 0x40020800
+GPIO D: 0x40020C00
+GPIO E: 0x40021000
+
+Vi vill sätta upp:
+port D bitar 0-7 som en 8-bitars utport
+port D bitar 8-15 som en 8-bitars inport
+
+Den önskade funktionen får vi om MODE-registret initieras enligt:
+offset 31 30 29 28|         ...        17 16|15           ...             0
+       0  0  0  0 | 00 00 | 00 00 | 00 0  0 | 01 01 | 01 01 | 01 01 | 01 01
+       0          | 0     | 0     | 0       | 5     | 5     | 5     | 5
+
+Bitar 0-7 : 01, alltså digital utgång
+Bitar 8-15: 00, alltså digital ingång
+
+Vilket ger:
+    *((volatile unsigned int *) 0x40020C00) = 0x00005555;
+
+eller:
+    LDR R0,=0x00005555
+    LDR R1,=0x40020C00
+    STR R0,[R1]
+
+
+#BASIC IO
+#define GPIO_D 0x40020C00
+#define GPIO_MODER    ((volatile unsigned int   *) (GPIO_D     ))
+#define GPIO_OTYPER   ((volatile unsigned short *) (GPIO_D+0x4 ))
+#define GPIO_PUPDR    ((volatile unsigned int   *) (GPIO_D+0xC ))
+#define GPIO_IDR_LOW  ((volatile unsigned char  *) (GPIO_D+0x10))
+#define GPIO_IDR_HIGH ((volatile unsigned char  *) (GPIO_D+0x11))
+#define GPIO_ODR_LOW  ((volatile unsigned char  *) (GPIO_D+0x14))
+#define GPIO_ODR_HIGH ((volatile unsigned char  *) (GPIO_D+0x15))
+
+
+
+
+
+
