@@ -801,8 +801,254 @@ void main(void)
     }
 }
 
+Absolut adressering
+#EXEMPEL 
+0x40021014 // en heltalskonstant (int)
+// en pekare (unsigned char) som pekar på adress 0x40021014
+(unsigned char*) 0x40021014
+// innehåller 8 bitar, på adress 0x40021014 (dereferens)
+*((unsigned char*) 0x40021014)
+
+Läs från adressen:
+unsgined char value = *((unsigned char *) 0x40021014);
+
+Skriv till adressen:
+*((unsigned char *) 0x40021014) = value;
+
+Volatile förhindrar viss optimering (som annars är bra och nödvändig) dvs. indikerar
+att kompilatorn måste förmoda att innehållet på en adress kan ändras "från utsidan", dvs en ändring
+kan inte upptäckas vid statisk analys av koden.
+
+volatile char * utport = (char *) 0x40021014;
+volatile char * inport = (char *) 0x40021014;
+
+#PORTADRESSERING
+#define GPIO_E         0x40021000
+#define GPIO_E_MODER   ((volatile unsigned int   *)  GPIO_E   )
+#define GPIO_E_OTYPER  ((volatile unsigned short *) (GPIO_E+4))
+#define GPIO_E_OSPEEDR ((volatile unsigned int   *) (GPIO_E+8))
+...
+
+Vita bitar används, gråa används inte
+
+GPIO_ODR kan man skriva ut värden till portpinnarna
+
+...
+#define GPIO_E_ODR      ((volatile unsigned short *) (GPIO_E+0x14))
+#define GPIO_E_ODR_LOW  ((volatile unsigned char  *) (GPIO_E+0x14))
+#define GPIO_E_ODR_HIGH ((volatile unsigned char  *) (GPIO_E+0x15))
+...
+
+value = *GPIO_E_ODR_LOW;
+*GPIO_E_ODR_HIGH = value;
+
+#PEKARARITMETIK
+Följande operationer är tillåtna på pekare:
+Adressoperator &
+Dereferens     *
+Addition av heltalskonstant
+Subtraktion av heltalskonstant
+Subtraktion av pekare med samma typ
+Alla andr aoperationer, som exempelvis skrift, negation, bitvis complement,
+multiplikation eller division etc. är meningslösa och därför förbjudna!
+
+#EXEMPEL
+char c, *cp1, *cp2;
+cp1 = &c;   //OK!
+cp2 = &cp1; //WARNING
+
+#EXEMPEL
+char *cp1;
+cp1 = cp1 + 1;
+++cp1;
+cp1++;
+
+...
 
 
+Vid addition och subtraktion, pekartypen avgör hur mkånga bytes som adderas/subtraheras
+#EXEMPEL
+char *cp = (char *) 0x20001000;
+cp++:   // cp är därefter 0x20001001
+(cp+1); // Uttryckets värde: 0x20001001
 
+int *ip = (int *) 0x20001000;
+ip++;   // ip är därefter 0x20001004
+(ip+1); // Uttryckets värde: 0x20001004
+
+ptr + n => ptr + n*sizeof(ptrtype)
+ptr - n => ptr - n*sizeof(ptrtype)
+
+
+Fält eller pekare?
+x[y] översätts till *(x+y)
+så detta är också en pekare
+Indexering är samma sak för pekare och fält
+
+int main(void)
+{
+    char* s1   = "Emilia";
+    char  s2[] = "Emilia";
+    // tre likvärdiga sätt att dereferera en pekare/ i ett fält:
+    prinft("\'l\' in Emilia (version 1): %c \n", *(s1+3));
+    prinft("\'l\' in Emilia (version 2): %c \n",   s2[3]);
+    prinft("\'l\' in Emilia (version 2): %c \n",   3[s2]);
+    return 0;
+}
+
+
+Fält och pekare är dock inte samma sak
+
+#FÄLT ELLER PEKARE, I KORTHET
+#EXEMPEL
+char *s1   = "Emilia";
+char  s2[] = "Emilia";
+
+s1:
+Typ:
+    Pekarvairabel
+Adressering:
+    &s1 = adress till variabel s1
+    s1 = s1's värde = textsträngens startadress
+    s1 = &(s1[0])
+    s1[0] := *s1 -> 'E'
+Pekararitmetik:
+    s1++      är OK
+    (s1+1)[0] är OK
+Typstorlek:
+    sizeof(s1) = sizeof(char*) = 4 bytes
+
+s2:
+Typ:
+    Fält
+Adressering:
+    &s2 är inte möjligt - s2 är bara en symbol
+    s2 = symbol = fältets startadress
+    s2 = &(s2[0])
+    s2[0] := *s2 -> 'E'
+Pekararitmetik:
+    s2++ är inte möjligt
+    (s2+1)[0] är ok
+Storlek:
+    sizeof(s2) = 7 bytes
+
+s2 är en symbol (ingen variabel) för en adress känd vi kompileringstillfället.
+Eftersom s2 är en adress, kan vi dereferera den på samma sätt som en pekare: *s2 -> 'E'.
+
+Assembly:
+2000001c <s1>:
+2000001c: 20000028
+
+20000020 <s2>:
+20000020: "Emil"
+20000020: "ia\0"
+20000028: "Emil"
+2000002c: "ia\0"
+
+
+#KOPIERING AV TEXTSTRÄNG - strcpy
+#EXEMPEL
+I standard-C biblioteket finns funktionen strcpy, för att kopiera en ASCII-sträng 
+i minnet. Strängslut markeras med tecknet '\0', dvs. 0 och detta tecken ska vara det
+sista som kopieras. Funktionen returnerar dest och kan implementeras på följande sätt, visa hur 
+strcpy kan kodas i assembly.
+
+char *strcpy(char *dest, char *src)
+{
+    char *rval = dest;
+    do {
+        *dest++ = *str++;
+    } while ( *(src-1));
+    return rval;
+}
+
+R0 = &dest
+R1 = &src
+R2 = temp
+R3 = rval
+
+strcpy: MOV  R3,R0
+.L0     LDRB R2,[R1]
+        STRB R2,[R0]
+        ADD  R1,R1,#1
+        ADD  R0,R0,#1
+        CMP  R2,#0
+        BNE  .L0
+        MOV  R0,R3
+        BX   LR
+
+
+Fler skäl att använda pekare
+Argument är värdeanrop, "pass-by value" i C.
+
+
+void inc1(int x)
+{
+    x++;
+}
+
+void inc2(int *x)
+{
+    (*x)++;
+}
+
+int main(void)
+{
+    int x1=0, x2=0;
+
+    inc1( x1);
+    inc2(&x2);
+    return 0;
+}
+
+inc1 kommer inte inte att öka x1's värde, för argumentet är bara en kopia av variabeln
+inc2 kommer att öka värdet på x2 eftersom den påverkar värdet på variabelns adress
+
+
+#PEKARE TILL FUNKTIONER - FUNKTIONSPEKARE
+En funktionspekare definiera av:
+Returvärdet
+Argument och deras respektive typer
+Funktionspekarens värde är en adress
+
+#EXEMPEL
+int foo0(void );   // funktionsprototyp
+int foo1(int x);   // funktionsprototyp
+int (*funp) (int); // Deklaration av variabel 'funp'
+
+funp = foo0;       // WARNING, typfel
+funp = foo1;       // OK!
+
+Pekare till funktioner:
+#EXEMPEL
+#include <stdio.h>
+
+int square(int x)
+{
+    return x*x;
+}
+
+int main()
+{
+    int (*funp)(int);
+    funp = square;
+    prinft("fp(5)=%i \n", funp(5));
+    return 0;
+}
+// printar funp(5)=25
+
+Vi har följande funktioner
+void do_this(void) {}
+void do_that(void) {}
+
+Vi kan deklarera en variabel func, som en pekare till en sådan funktion.
+void (*func)(void);
+Vi har sedan ytterligare ett instrument at tpåverka programflödet:
+if (...)
+    func=&do_this;
+else
+    func=&do_that;
+    ...
+func(); /* do_this eller do_that...*/
 
 
