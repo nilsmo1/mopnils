@@ -503,15 +503,276 @@ f:   PUSH {R4,R5,R6,LR}
      POP {R4,R5,R6,PC}
 
 
+#C 
+Arrays
+int intvec[n];
+int initintvec[]={10,20,30,40,50};
+
+
+Utforska arrayen
+int main(void)
+{
+    int initvec[]={10,20,30,40,50};
+    for (int i=0; i< sizeof(initvec)/sizeof(int); i++)
+        printf("%d ", initvec[i]);
+    return 0;
+}
+
+
+Sista karaktären i en string/char array är '\0'
+char animal1[] = "Monkey";
+char animal2[] = {'M','o','n','k','e','y',0};
+
+
+
+strlen ger längden av en sträng inklusive '\0'
+
+
+
+int strlen(char s[])
+{
+    int i = 0;
+    while (s[i]!='\0')
+        i++
+    return i+1
+
+}
+
+
+
+char charvec[N];
+sizeof(charvec) = N bytes
+
+short shortvec[N];
+sizeof(shortvec) = N*2 bytes
+
+int ... N*4 bytes
+
+
+Fält i assembly
+char charvec[5];
+LDR  R0,=charvec
+LDRB R0,[R0,#5]
+
+char charvec[i];
+
+LDR  R0,=charvec
+LDR  R1,i
+LDRB R0,[R0,R1]
+
+
+int i;
+short sv[N];
+sv[i];
+=sv + i*sizeof(short)
+LDR   R0,=sv
+LDR   R1,i
+LSL   R1,R1,#1
+LDRSH R0,[R0,R1]
+
+
+int i;
+int iv[N];
+iv[i];
+=iv + i*sizeof(int)
+
+LDR R0,=iv
+LDR R1,i
+LSL R1,R1,#2
+LDR R0,[R0,R1]
+
+
+#EXEMPEL
+Vi har deklarationerna:
+char c; int i;
+char vec[15];
+Visa hur följande tilldelning kan kodas:
+c = vec[i];
+
+Adress till vec[i]=vec+i*sizeof(char)
+svar:
+LDR  R0,=vec
+LDR  R1,i
+LDRB R0,[R0,R1]
+LDR  R1,=c
+STRB R0,[R1]
+
+Samma för shortvec
+LDR  R0,=s
+LDRH R0,[R0]
+LDR  R1,=vec
+LDR  R2,i
+LSL  R2,R2,#1
+STRH R0,[R1,R2]
+
+
+#EXEMPEL
+char mc[N][M];
+int i1,i2;
+
+Referens:     mc[i1][i2]
+Minnesadress: =mc + ((i1*M)+i2)*sizeof(char)
+
+Kompilatorn ersätter multiplikationer med skift/add kominationer efter mul-instruktionen
+tar betydligt fler klockcykler att utföra.
+M = 2^x  +  y
+Ex då M=10: 10 = 2^3  +  2
 
 
 
 
+#EXEMPEL
+int i,j;
+int veci[80];
+int vm[10][5];
+
+Visa kodsekvenser som evaluerar följande uttryck till R0
+a) veci[j]
+Adress =veci + j*sizeof(int)
+LDR R0,j
+LSL R0,R0,#2
+LDR R1,=veci
+LDR R0,[R1,R0]
+
+
+b) vm[i][j]
+Adress =vm + ((i+5)+j)*sizeof(int)
+LDR R3,i
+LSL R2,R3,#2
+ADD R3,R3,R2
+LDR R2,j
+ADD R3,R3,R2
+LSL R3,R3,#2
+LDR R2,=vm
+LDR R0,[R2,R3]
+
+#PEKARE
+int strlen(char* s)
+{
+    int i = 0;
+    while (*s)
+    {
+        s++;
+        i++;
+    }
+    return i+1;
+}
+
+#EXEMPEL
+Vi har deklarationerna:
+char c,*cptr;
+int *iptr;
+
+Koda följande:
+a) cptr = iptr;
+LDR R0,iptr
+LDR R1,=cptr
+STR R0,[R1]
+
+b) *cptr = *iptr;
+LDR  R0,iptr
+LDR  R0,[R0]
+LDR  R1,cptr
+STRB R0,[R1]
+
+c) cptr = &c;
+LDR R0,=c
+LDR R1,=cptr
+STR R0,[R1]
+
+d) c = *cptr;
+LDR  R0,cptr
+LDRB R0,[R0]
+LDR  R1,=c
+STRB R0,[R1]
+
+
+#EXEMPEL 
+int i;
+char vecc[20];
+
+Visa en kodsekvens som evaluerar uttrycket &vecc[i-1] till R0
+Lösning:
+minnesadress: =vecc + i-1
+
+LDR R0,=vecc
+LDR R1,i
+SUB R1,R1,#1
+ADD R0,R0,R1
+
+
+int i;
+int mi[12][8];
+Visa: &mi[i][4]
+Lösning:
+minnesadress: =mi+(i*8+4)*4
+LDR R0,=mi
+LDR R1,i
+LSL R1,R1,#3
+ADD R1,R1,#4
+LSL R1,R1,#2
+ADD R0,R0,R1
 
 
 
+#VAD ÄR EN PORT
+En "port" är i själva verket ett register som finns på en kostant adress 
+i minnesutrymmet.
+För att läsa från, eller skriva till registret måste vi därför kunna
+dereferera en konstant.
+Alltså måste konstanten först typkonverteras til len pekare, syntaxen kräver då:
+"*((typ *) konstant)"
+
+#EXEMPEL
+Då en 16-bitars port på adressen 0x40021010 refereras enligt:
+    *((volatile unsigned short*) 0x40021010);
+Detta kodas i assembly:
+LDR  R0,=0x40021010
+LDRH R0,[R0]
+
+Användning av en konstant pekare
+#EXEMPEL
+Visa, såväl i C som i assembly, hur de fyra minst signifikanta bitarna
+hos en läs- och skrivbar port på adress 0x40021014 sätts till 1
+medan resterande bitarna lämnas opåverkade.
+GPIO_ODR
+
+C:
+#define GPIO_ODR (*(volatile unsigned short*) 0x40021014)
+Volatile för att det kan komma att ändras
+*GPIO_ODR |= 0x0F;
+
+Assembly:
+LDR  R0,=0x40021014
+LDRH R0,[R0]
+MOV  R3,#0x0F
+ORR  R0,R0,R3
+LDR  R1,=0x40021014
+STRH R0,[R1]
 
 
+#Ett första projekt med MD407
+Demo: basic_io
+
+void app_init(void)
+{
+    *((unsigned long*) 0x40020c00) = 0x00005555;
+}
+
+void main(void)
+{
+    unsigned char c;
+    app_init();
+    while(1)
+    {
+        c = (unsigned char) *((unsigned short *) 0x40021010);
+        *((unsigned char*) 0x40020C14) = c;
+    }
+}
+
+#STANDARD SET
+Anslut GPIO E pin 0-7 till 8 bit dipswitch
+Anslut GPIO D pin 0-7 till 8 segment bargraph
 
 
 
