@@ -1155,6 +1155,91 @@ eller:
 #define GPIO_ODR_LOW  ((volatile unsigned char  *) (GPIO_D+0x14))
 #define GPIO_ODR_HIGH ((volatile unsigned char  *) (GPIO_D+0x15))
 
+#define USE_ASM
+void app_init(void)
+{
+#ifdef USE_ASM
+__asm__ volatile("  LDR R0,=0x00005555\n");
+__asm__ volatile("  LDR R1,=0x40020C00\n");
+__asm__ volatile("  STR R0,[R1]\n");
+#else
+    *GPIO_MODER = 0x00005555;
+#endif
+}
+
+void main(void)
+{
+    char c;
+    app_init();
+    while(1)
+    {
+        c = *GPIO_IDR_HIGH;
+        *GPIO_ODR_LOW = c;
+    }
+}
+
+#PUPDR
+För att säkerställa en stabil nivå på ingången kan 
+man koppla in ett motstånd till antingen Vdd eller GND
+Oavsett vilken lösning vi väljer kan vi alltid avgöra
+om brytaren är öppen eller stängd
+
+
+#IO-PINNE KONFIGURERAD SOM INGÅNG
+Vi kan programmera "pull-up" eller "pull-down"-funktion, inget externt
+motstånd behövs.
+
+För varje portpinne används 2 bitar i PUPDR för att konfigurera pinnen enligt:
+00: floating
+01: pullup
+10: pulldown
+11: reserverad
+
+"push-pull" steg då motsvarande bit i OTYPER är 0
+"open drain" steg då motsvarande bit i OTYper är 1
+
+Utgångar från flera push-pull steg får inte kopplas samman, eftersom
+det kan leda till kortslutning mellan Vdd och GND.
+
+#OPEN DRAIN
+Utgångar från flera open-drain steg kan kopplas samman utan problem.
+Nivån på den gemensamma "bussen" bestäms av att:
+Om alla utgångar är 1 är också bussnivån 1
+Om någon utgång är 0 är också bussnivån 0
+
+#OUTPUT SPEED
+Bestämmer hur ofta registrets innehåll överförs till utgångssteget.
+Ju lägre frekvens desto mindre strömförbrukning.
+
+För varje portpinne används 2 bitar i OSPEEDR för att konfigurera pinnen enligt:
+00: low speed, 2 MHz
+01: medium speed, 25 MHz
+10: fast speed, 50 MHz
+11: high speed, 100 MHz
+
+Om hastigheten är 50 MHz eller mer måste en så kallad "IO-kompensationscell" aktiveras
+
+#MULTIPLEX FUNKTION
+Använd samma ingång för flera funktioner
+
+#keyb - RUTIN FÖR AVSÖKNING AV TANGENTBORD
+#EXEMPEL
+Konstruera en funktion:
+    char keyb(void);
+Funktionen ska avsöka tangetbordet en gång.
+Om ingen tangent är nedtryckt ska funktionen returnera värdet 0xFF.
+Om någon tangent är nedtryckt ska dess tangentkod returneras.
+Om flera tangenter är nedtryckta är valet av tangentkod, bland dessa, godtyckligt
+
+Algo:
+for row 1..4
+    activaterow
+    col = readcol
+    if col != 0
+        keyb=value[pressedkey]
+keyb = 0xFF
+
+
 
 
 
