@@ -1239,9 +1239,324 @@ for row 1..4
         keyb=value[pressedkey]
 keyb = 0xFF
 
+kbdActivate:
+void kbdActivate(unsigned int row)
+{
+    switch(row){
+        case 1 : *GPIO_ODR_HIGH = 0x10;break;
+        case 2 : *GPIO_ODR_HIGH = 0x20;break;
+        case 3 : *GPIO_ODR_HIGH = 0x40;break;
+        case 4 : *GPIO_ODR_HIGH = 0x80;break;
+        default: *GPIO_ODR_HIGH = 0;
+    }
+}
+
+kbdGetCol:
+int kbdGetCol(void)
+{
+   unsigned char c;
+   if (c&8) return 4;
+   if (c&4) return 3;
+   if (c&2) return 2;
+   if (c&1) return 1;
+   return 0;
+}
+
+keyb
+char keyb(void)
+{
+    char key[]=
+    {1,2,3,0xA,
+     4,5,6,0xB,
+     7,8,9,0xC,
+     0xE,0,0xF,0xD
+    };
+    int row,col;
+    for (row=1;row<5;row++)
+    {
+        kbdActivate(row);
+        if (col=kbdGetCol())
+        {
+            kbdActivate(0);
+            return key[4*(row-1)+(col-1)];
+        }
+    }
+    kbdActivate(0);
+    return 0xFF;
+}
+
+#ALGO INIT GPIO
+Set Port MODER; // Sätt innehåll i MODE registret
+if (har_input_pins)
+    Set PUPDregister; // sätt innehåll i PUPD
+if (har_output_pins)
+    Set OTYPER;
+    SET OSPEEDR;
+if (all_port_pin)
+    *GPIO_XXY... = z;
+else
+    *GPIO &= ~specifika pinnar // anda med negationen av de specifika pinnarna
+    *GPIO |= specifika pinnar
+
+
+#BSSR - SYNKRONISERAD UPPDATERING
+Kan användas för en synkroniserad ändring av flera utångars pinnar.
+    bit 0..15 : bit reset
+    bit 16..31: bit set
+
+BSSR (bit set/reset register)
+GPIO_BSSR
+
+
+#SYNKRONISERING
+
+tc   - cykel tid
+tw   - klockpuls (enable) varaktighet (hög eller låg)
+tsu1 - styrsignalernas setup-tid, före positiv enable-flank
+tsu2 - setup-tid för data, skrivning, före negativ enable-flank
+tD   - setup-tid för data, läsning, före negativ enable-flank
+th   - hold-tid, varaktighet (efter negativ enable-flank)
 
 
 
+Härledning av algo
+Byt esom ska överföras:
+dataregister: DB 7..0
+DB 7
+DB 6 - enable (synkroniserande signal)
+DB 5 
+DB 4 
+DB 3
+DB 2 - SELECT=1
+DB 1 - R/W (läs eller skriv)
+DB 0 - RS (kommando eller ASCII-data)
+
+Skriv 8 bitar till controller
+styrregister(RW)=0;
+vänta tsu1;
+styrregister(enable)=1:
+dataregister=(8 bitar);
+vänta tsu2; (Dock till minst tw förflutit
+enable=0;)
+vänta tills totalt tc förflutit;
+
+#SYSTIK - RÄKNARKRETS
+STK_VAL
+STK_CALIB
+
+STK_LOAD   _______________________________  ...
+           .        .        .        .
+           | .      | .      | .      | .    
+STK_VAL -----> .    |   .    |   .    |    
+           |     .  |     .  |     .  |       
+           |_______.|_______.|_______.|_____... -> t
+           0     reload   reload   reload
+
+STK_CTRL (0xE000E010) status och styrregister
+rw, bit 16 + 2-0 bitar
+Bit 2 (CLKSOURCE) biten är 1 eller RESET:
+0: systemklockan/8 (168MHz/8 = 21MHz)
+1: systemklocka    (168MHz)
+Bit 1 (TICKINT) aktivera avbrott
+0: inget avbrott genereras
+1: då räknaren slagit om till 0 genererar SysTick avbrott
+bit 16 (COUNTFLAG)
+Biten är 1 om räknaren räknat ned till 0
+Biten nollställs då registret läses
+Bit 0 (ENABLE) aktiverar räknare
+0: Räknare deaktiverad
+1: räknare aktiverad
+
+STK_LOAD (0xE000E014) räknarintervall
+rw, 23-0 bitar
+
+#EXEMPEL
+Peiodtid= 1/(168*10^-6)s = 6ns
+
+För 168/(168*10^-6) får vi räknarintervallet 1us
+                                  ____
+COUNTFLAG   _____________________|
+               __    __    __    __
+KLOCKSIGNAL __|  |__|  |__|  |__|  |__
+                 2     1     0  #
+Omslaget till 0 sker i slutet av perioden (#) vilket gör 
+att den korrekta initieringen för 1us fördröjning blir 168-1 klockcykler
 
 
+#FÖRDRÖJNING MED SYSTICK
+Skapa en funktion delay_250ns(void) som blockerar (fördröjer) den anropade funktionen
+med minst 250 ns. Visa också hur denna kan användas för att skapa en fördröjningsrutin:
+    delay_micro(unsigned int us) 
+som fördröjer programexekveringen variabelt antal mikrosekunder.
+#ALGO
+    STK_CTRL=0              Återställ SYSTICK
+    STK_LOAD = CountValue  
+    STK_VAL=0               Nollställ räknarregistret
+    STK_CTRL=5              Starta om räknaren
+    Vänta  till COUNTFLAG=1
+    STK_CTRL=0              Återställ SYSTICK
 
+Lösning:
+void delay_250ns(void)
+{
+    *STK_CTRL = 0;
+    *STK_LOAD = 168/4 - 1;
+    *STK_VAL  = 0;
+    *STK_CTRL = 5;
+    while ((*STK_CTRL & 0x10000)==0);
+    *STK_CTRL = 0;
+}
+
+Lösning:
+void delay_mikro(int us)
+{
+    int i;
+    for (i=1;i<us+1;i++)
+    {
+       delay_250ns(); 
+       delay_250ns(); 
+       delay_250ns(); 
+       delay_250ns(); 
+    }
+}
+
+
+#PERIODISKT BLINKANDE DIODRAMP
+Vi har en diodramp ansluten till port D (0-7). Demonstrera en applikation som får 
+hela rampen att blinka 1 gång/sekund.
+
+se Demonstration: Laborationsuppgift 2.2 under hemsidans "Laboration 2"
+Program har helt olika tidsegenskaper då dom utförs i simulator
+respektive hårdvara. Använd villkorlig kompilering för att anpassa fördröjning
+i exemplet för simulator. (SYNKRONISERING klipp 3)
+
+#PROGRAMMERING av ASCII-Display 
+Implementera funktionerna:
+ascii_write_controller(cmd/data)
+status/data=ascii_read_controller()
+status=ascii_read_status()
+
+Kretsen översätter ASCII-tecken till motsvarande bit-mönster via ett enkelt
+gränssnitt:
+    styrregister - 4 bitar används ?
+    dataregister - 8 bitar används ?
+
+#ANSLUTNING AV ASCII-DISPLAY
+Vi konfigurerar två 8-bitars portar i GPIO E.
+GPIO_IDR, GPIO_ODR
+Styrregister 0-7
+Data         8-15
+LCD-modul DATA PE8-15 är en utport för data till ASCII-styrkretsen
+men vänds till en inport då vi läser data från ASCII-styrkretsen
+
+#ÄNDRA ENSTAKA BITAR I STYRREGISTRET (line 1324!)
+Masker för kontrollbitar
+#define B_E      0x40       Enable-signal
+#define B_SELECT 4          Välj ASCII-display
+#define B_RW     2          0=write  , 1=read
+#define B_RS     1          0=control, 1=data
+
+
+void ascii_ctrl_bit_set(char x)
+{*/x: bitmask bits are 1 to set */
+    char c;
+    c = *GPIO_E_ODR_LOW;
+    *GPIO_E_ODR_LOW = B_SELECT | x | c;
+}
+
+void ascii_ctrl_bit_clear(char x)
+{*/x: bitmask bits are 1 to clear */
+    char c;
+    c = *GPIO_E_ODR_LOW;
+    c = c & ~x;
+    *GPIO_E_ODR_LOW = B_SELECT | c;
+}
+
+Alternativt, använd "macro"-definitioner
+#define ASCII_CTRL_BIT_SET(x)  \
+        *GPIO_E_ODR_LOW =      \
+        (B_SELECT | x | *GPIO_E_ODR_LOW)
+
+#define ASCII_CTRL_BIT_CLEAR(x) \
+        *GPIO_E_ODR_LOW =       \
+        (B_SELECT | (*GPIO_E_ODR_LOW & ~(x)))
+
+#GE KOMMANDO TILL STYRKRETS
+Formulering av algoritm för att överföra ett specifikt kommando till styrkrets
+(SE LEKTION 7 KLIPP 6 början)
+
+#EXEMPEL
+Kodning för att skriva kommandot "Clear display"
+Vänta tills display är klar att ta emot kommando
+while ((ascii_read_status() & 0x80)==0x80) {}
+delay_micro(8);       // latenstid för kommando
+ascii_write_cmd(1);   // kommando: "Clear display"
+delay_milli(2);       // i stället för 1,53ms
+
+#STATUS = ascii_read_status()
+För att läsa från styrkretsen måste vi "vända" riktningen hos port E15-E8 ("dataregistret")
+Algo_
+ascii_read_status
+Sätt PortE bit15-8 som ingångar
+RS=0;
+RW=1;
+rv=ascii_read_controller
+Sätt PortE bit15-8 som utgångar
+return rv
+
+char ascii_read_status(void)
+{
+    char c;
+    
+    *GPIO_E_MODER = 0x00005555;
+    ascii_ctrl_bit_set  (B_RW);
+    ascii_ctrl_bit_clear(B_RS);
+    c = ascii_read_controller();
+
+    *GPIO_E_MODER = 0x55555555;
+    return c;
+}
+
+#ascii_read_controller(cmd)
+Algo:
+ascii_read_controller
+E=1;
+delay360ns
+rv = DATA_REG;   
+E=0;
+return rv;
+
+char ascii_read_controller(void)
+{
+    char c:
+    ascii_ctrl_bit_set(B_E);
+
+    delay_250ns();
+    delay_250ns();
+
+    c = *GPIO_E_IDR_HIGH;
+
+    ascii_ctrl_bit_clear(B_E);
+
+    return c;
+}
+
+
+#ascii_write_controller(cmd)
+Implementering av algoritment RS och RW är klara
+Algo:
+ascii_write_controller(cmd)
+delay40ns
+E=1;
+DATA_REG = cmd
+delay230ns
+E=0;
+delay10ns
+
+void ascii_write_controller(char c)
+{
+    ascii_ctrl_bit_set(B_E);
+    *GPIO_E_ODR_HIGH = c;
+    ascii_ctrl_bit_clear(B_E);
+    delay_250ns();
+}
