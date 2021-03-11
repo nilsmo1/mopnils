@@ -1560,3 +1560,85 @@ void ascii_write_controller(char c)
     ascii_ctrl_bit_clear(B_E);
     delay_250ns();
 }
+
+#LEKTION 8 - SAMMANSSATTA DATATYPER
+#typedef - ALIAS FÖR EN TYP
+typedef används för att skapa ett alias, oftast för att förenkla 
+och förkorta typuttryck.
+Avsikten är att förtydliga och öka läsbarheten, syntaxen är:
+typedef typ alias_typnamn [,alias_typnamn ]...;
+
+#EXEMPEL
+typedef unsigned char uint8;
+typedef short int     int16;
+typedef unsigned char *ucharptr;
+
+uint8 a,b = 0, c;
+ucharptr p;
+typedef int postnr;
+typedef int strtnr;
+postnr x = 41501;
+strtnr y = 3;
+x = y; // Typriktigt, helt ok
+
+#STRUCT ("POST"), en sammansatt datatyp
+Har en eller flera medlemmar (fields).
+En medlem kan vara av godtycklig typ, exempelvis:
+    int,char,long(signed/unsigned),float,double
+    Användardefinierad(med "typedef")
+    Sammansatt typ (dvs. en annan struct)
+    Alla typer av pekare
+
+Syntax:
+struct structnamn {
+    medlem;
+    [medlem; [medlem;]...]
+}
+
+Deklaration av struct
+struct structnamn{
+   ...
+};
+
+struct structnamn {
+   ...
+} v1,v2,v3...;
+
+
+Det är vanligt med användardefinierade struct-typer
+typedef struct structnamn TSTRUCTNAMN;
+alt.
+typedef struct structnamn {
+   ...
+} TSTRUCTNAMN;
+
+#EXEMPEL
+typedef struct coord {
+    int x,y;
+} COORD;
+
+struct coord start,end;
+eller 
+COORD start,end;
+
+#ANVÄNDNING
+-----
+#include <stdio.h>
+typedef struct coord{int x,y;} COORD;
+
+int main() 
+{
+    struct coord start;
+    COORD end;
+
+    start.x = 10; start.y = 10;
+    end.x   = 20; end.y   = 20;
+
+    prinft("Line starts at (x,y) %d,%d \n
+            and ends at (x,y) %d,%d \n",
+                start.x,start.y
+                end.x  ,end.y);
+    return 0;
+}
+-----
+
