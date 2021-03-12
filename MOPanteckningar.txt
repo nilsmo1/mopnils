@@ -1642,3 +1642,383 @@ int main()
 }
 -----
 
+#REFERENSER
+#EXEMPEL
+Datatyp för koordinater
+typedef struct
+{
+    int x,y;
+} COORD;
+
+#EXEMPEL
+Vi har deklarationerna
+COORD start, end;
+Koda tilldelningen:
+start.y = end.y;
+i assembly:
+Lösning:
+    LDR R0,=end      R0      <- &end
+    LDR R0,[R0, #4]  R0      <- end.y
+    LDR R1,=start    R1      <- &start
+    STR R0,[R1,#4]   start.y =  end.y
+
+#INBÄDDAD POST
+Ev rättningsvillkor måste respekteras
+En annan post kan ingå i en större post
+
+#EXEMPEL
+Vi har deklarationen:
+typedef struct 
+{
+    short width;
+    COORD start;
+    COORD end;
+} LINE, *PLINE;
+LINE l;
+
+.ALIGN           2
+offset_width   = 0
+offset_start.x = offset_width   + sizeof(width)   + align(2)
+offset_start.y = offset_start.x + sizeof(start.x) + align(2)
+offset_end.x   = offset_start.y + sizeof(start.y) + align(2)
+offset_end.y   = offset_end.x   + sizeof(end.x)   + align(2)
+
+Visa kodsekvensen som evaluerar följande uttryck i register R0:
+a) l.width
+    LDR  R0,=l
+    LDRH R0,[R0,#0]  R0=l+0 (offset_width)
+b)
+    LDR R0,=l
+    LDR R0,[R0,#16]  R0=l+16 (offset_end.y)
+
+#ALTERNATIVA DEKLARATIONER
+struct line 
+{
+    struct coordinate 
+    {
+        int x,y;
+    } start, end;
+} linje;
+
+Referenser
+linje.start.x;
+linje.end.y;
+coordinate inte tillgänglig utanför line
+etc...
+
+struct coordinate 
+{
+    int x,y;
+}
+
+struct line 
+{
+    struct coordinate start;
+    struct coordinate end;
+} linje;
+
+Referenser
+linje.start.x;
+linje.end.y;
+coordinate tillgänglig utanför line
+
+
+#INITIERING, FULLSTÄNDIG OCH OFULLSTÄNDIG
+En struct kan initieras med en lista.
+Medlemmarna tilldelas värden i samma ordning som deklarationen.
+
+struct Course 
+{
+    char  *name;
+    float credits;
+    int   numberOfParticipants;
+};
+
+struct Course c1 = {"MOP", 7.5, 110}; Fullständig
+struct Course c2 = {"MOP", 7.5};      Ofullständig
+
+
+
+#OFULLSTÄNDIG DEKLARATION
+En struct kan först ges som en ofullständig deklaration, för att senare
+definieras fullständigt.
+
+#EXEMPEL
+struct coordinate;
+
+
+struct line 
+{
+    struct coordinate start;
+    struct coordinate end;
+};
+
+FEL:
+Storleken av struct coordinate är okänd, alltså kan inte storleken av 
+struct line bestämmas.
+
+struct linepointers
+{
+    struct coordinate *start;
+    struct coordinate *end;
+};
+
+OK:
+En pekarstorlek är alltid känd, alltså kan storleken av struct linepointers bestämmas.
+
+
+#PEKARE TILL struct, PILNOTATION
+Det är vanligt att använda pekare och pilnotationen förenklar detta betydligt.
+
+#EXEMPEL
+struct coordinate {int x,y;} c1;
+struct coordinate *ptr;
+
+ptr = &c1;
+Direkt, variabel via punkoperator
+c1.x = ...
+
+eller via derefererad pekare
+(*ptr).x = ...
+
+eller kortare, piloperatorn
+p->x = ...
+
+
+#EXEMPEL
+Koordinaterna i en länkad lista
+
+typedef struct tPoint 
+{
+    char x;
+    char y;
+    struct tPoint *next;
+} POINTLIST;
+
+Gå igenom lista av koordinater
+POINTLIST *first;
+...
+POINTLIST p = first;
+while (p != (POINTLIST  *) 0)
+{
+    Gör någonting med koordinaten
+    p = p->next;
+}
+
+#PEKARE TILL struct, PILNOTATION
+#EXEMPEL
+typedef struct coord {
+    int x,y;
+    struct coord *next;
+} COORD;
+COORD c1,..., c10;
+COORD *first; *p;
+
+Koda tilldelningarna:
+a: first = &c1;
+b: p = first;
+c: p->next = &c10; // (*p).next = &c10;
+                   // p->next = &c10;
+
+a: 
+    LDR R0,=c1
+    LDR R1,=first
+    STR R0,[R1]
+b:
+    LDR R0,=first
+    LDR R0,[R0]
+    LDR R1,=p
+    STR R0,[R1]
+c:
+    LDR R0,=c10
+    LDR R1,=p
+    LDR R1,[R1]
+    STR R0,[R1,#8]
+
+#POSTADRESSERING MED POSTER
+struct-typen är också användbar för att deklarera portar
+// Som alternativ till:
+#define portModer   ((volatile unsigned int*) (GPIO_BASE))
+#define portOtyper  ((volatile unsigned int*) (GPIO_BASE+0x4))
+#define portOspeedr ((volatile unsigned int*) (GPIO_BASE+0x8))
+
+// Kan vi använda en post-definition som:
+typedef volatile struct 
+{
+    unsigned int moder;    //+0
+    unsigned int otyper;   //+0x4
+    unsigned int ospeedr;  //+0x8
+    unsigned int pupdr;    //+0xC
+    unsigned int idr;      //+0x10
+    unsigned int odr;      //+0x14
+    unsigned int bsrr;     //+0x18
+    unsigned int lckr;     //+0x1C
+    unsigned int afrl;     //+0x20
+    unsigned int afrh;     //+0x24
+} GPIO, *PGPIO;
+
+#EXEMPEL
+#define GPIO_D (*((volatile PGPIO) 0x40020C00))
+#define GPIO_E (*((volatile PGPIO) 0x40021000))
+
+GPIO_E.moder  = 0x55555555;
+GPIO_E.otyper = 0x00000000;
+GPIO_D.moder  = 0x55550000;
+GPIO_D.pupdr |= 0x00005555;
+
+#KONVERTERING TILL LÄMPLIG STORLEK
+GPIO GPIO_E;
+typedef unsigned char uint8_t;
+uint8_t x = *(uint8_t*)&GPIO_E.idr;
+uint8_t y = *((uint8_t*)&GPIO_E.idr+1);
+
+Deklarationen kan istället anpassas till portens olika 
+registers storlekar
+
+typedef volatile struct {
+    ...
+    unsigned short int otyper;
+    unsigned short int Reserved0;
+    ...
+} GPIO, *PGPIO;
+
+#INKAPSLING AV DATA, ETT "OBJEKT"
+#EXEMPEL: Arbetsboken, avsnitt 5.4
+
+typedef struct tPoint 
+{
+    unsigned char x;
+    unsigned char y;
+} POINT;
+
+#define MAX_POINTS 20
+
+typedef struct tGeometry 
+{
+    int numpoints;
+    int sizex;
+    int sizey;
+    POINT px[MAX_POINTS];
+} GEOMETRY, *PGEOMETRY;
+
+
+// Skapa och initiera ett object av typen GEOMETRY
+GEOMETRY ball_geometry = {12,4,4, {{0,1},{0,2},
+                                   {1,0},{1,1},{1,2},{1,3},
+                                   {2,0},{2,1},{2,2},{2,2},
+                                   {3,1},{3,2}}}; 
+                                   // Ofullständig initiering
+                                   // (12 av 20)
+#POSTER MED FUNKTIONSPEKARE
+Inkapsling av pekare till funktiner.
+#EXEMPEL
+typedef struct tObj {
+    PGEOMETRY geo;
+    int dirx, diry;
+    int posx, posy;
+    void (*draw)(struct tObj *);
+    void (*clear)(struct tObj *);
+    void (*move)(struct tObj *);
+    void (*set_speed)(struct tObj *, int, int);
+} OBJECT, *POBJECT;
+
+#EXEMPEL statisk initiering
+OBJECT ball = {
+    &ball_geometry,
+    0 , 0 ,
+    64, 32,
+    draw_object ,
+    clear_object,
+    move_object ,
+    set_object_speed
+};
+// draw - clear - move - set - object_speed är definierade
+
+#EXEMPEL dynamisk initiering
+OBJECT ball;
+ball.geo = &ball_geometry;
+...
+ball.set_speed = set_object_speed;
+
+
+Dynamisk initiering kan exempelvis användas för att ändra 
+egenskaper hos ett objekt baserat på olika händelser.
+#EXEMPEL: alternativ "move"-funktion
+void alt_move_obj(POBJECT o) {...}
+POBJECT pb;
+pb = &ball;
+pb->move = move_object;
+...
+pb->move(pb) // utförs med move_object
+...
+pb->move = alt_move_obj;
+...
+pb->move(pb) // utförs med alt_move_obj
+
+#PROGRAMMERING AV GRAFISK DISPLAY
+LABORATION 3
+
+PIXEL X (1-128)
+PIXEL Y (1-64 )
+
+#INBYGGDA FUNKTIONER FÖR GRAFISK DISPLAY
+Funktioner som anropas via processorns undantagshantering
+void graphic_initialize(void)
+void graphic_clear_screen(void)
+void graphic_pixel_set(int x, int y)
+void graphic_pixel_clear(int x, int y)
+
+Implementering:
+__attribute__((naked))
+void graphic_initialize(void)
+{
+    __asm volatile (" .HWORD 0xDFF0\n");
+    __asm volatile (" BX LR\n");
+}
+
+__attribute__((naked))
+void graphic_pixel_set(int x, int y)
+{
+    __asm volatile (" .HWORD 0xDFF2\n");
+    __asm volatile (" BX LR\n");
+}
+
+
+__attribute__((naked))
+void graphic_clear_screen(void)
+{
+    __asm volatile (" .HWORD 0xDFF1\n");
+    __asm volatile (" BX LR\n");
+}
+
+
+__attribute__((naked))
+void graphic_pixel_clear(int x, int y)
+{
+    __asm volatile (" .HWORD 0xDFF3\n");
+    __asm volatile (" BX LR\n");
+}
+
+
+#PLOT AV LINJE 
+LINE lines[]={{40,10,100,10},
+              ...
+              {40,10,40,60}};
+
+void main(void)
+{
+    graphic_initialize();
+    graphic_clear_screen();
+
+    while (1)
+    {
+        for (int i=0; i<sizeof(lines)/sizeof(LINE);i++)
+        {
+            draw_line(&lines[i]);
+            delay_milli(500);
+        }
+        graphic_clear_screen();
+    }
+}
+
+
